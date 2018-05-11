@@ -1,0 +1,56 @@
+function [lowerlim2bootnaive, upperlim2bootnaive] = BSerrorinparams2naive(residuals2naive_8, dosenc, beta2naive_8, cohort_8_naive, beta2_8, Vmaxnaiveavgcohort)
+coeffs2 = beta2_8(1:4);
+v_model2_naive = model2popallweeksnormednaive( dosenc, coeffs2, beta2naive_8);
+ options = optimset('Display','off','FunValCheck','on', ...
+                   'MaxFunEvals',Inf,'MaxIter',Inf, ...
+                   'TolFun',1e-6,'TolX',1e-6);
+nboot = 500;
+[~, bootIndices] = bootstrp(nboot, [], residuals2naive_8); % randomly generates indices
+bootResiduals = residuals2naive_8(bootIndices); % uses indices to sample from residuals with replacement
+varBoot = repmat(v_model2_naive,1,nboot) + bootResiduals; % creates simulated data set
+% build up the bootstrap data sets to the single population function
+
+cohort_8_boot = cohort_8_naive;
+
+for i = 1:nboot
+    cohort_8_boot(:,3) = varBoot(:,i);
+    paramslbn = zeros([2 1]);
+dose0ind = cohort_8_boot(:,2) == 0;
+ Vmaxcohortnaivedata = cohort_8_boot(dose0ind,:);
+ Vmaxnaiveavg_boot = mean(Vmaxcohortnaivedata(:,3));
+ 
+ params0 = .5;
+paramslb = 0;
+paramsub = 1;
+
+betabootnaive(i) = lsqnonlin(@fit_simp2popnaiveunw,...
+    params0,...
+    paramslb,...
+    paramsub,...
+    options,...
+    dosenc,...
+    varBoot(:,i),...
+    coeffs2,...
+    Vmaxnaiveavg_boot);
+ 
+% paramsubn = Inf([2 1]);
+% 
+% params0n = [ .1; 30];
+% % outputs betaLD50 with first 12 paramters slope values, second 12 are
+% % center values in week order
+% betaBoot(i,:) = lsqnonlin(@fit_simp1popnaive,...
+%     params0n,...
+%     paramslbn,...
+%     paramsubn,...
+%     options,...
+%     dosenc,...
+%     varBoot(:,i),...
+%     Vmaxnaiveavgcohort_boot);
+    
+   
+end
+
+
+ lowerlim2bootnaive = prctile(betabootnaive', 2.5);
+ upperlim2bootnaive = prctile(betabootnaive', 97.5);
+end
